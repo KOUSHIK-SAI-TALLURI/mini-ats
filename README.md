@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Mini ATS
 
-## Getting Started
+A small Applicant Tracking System for managing candidates through a hiring pipeline, with search and dashboard metrics.
 
-First, run the development server:
+**Live app:** YOUR-LIVE-LINK
+**Repository:** https://github.com/KOUSHIK-SAI-TALLURI/mini-ats
+
+## Features
+
+- **Candidate management:** add candidates, view their details, record interview notes, and delete candidates.
+- **Hiring stages:** Applied, Screening, Interview, Offer, Hired, Rejected. Change a candidate's stage from the list or the detail page, and every change is saved in a stage history timeline.
+- **Search and filter:** search by name, email, or role (case-insensitive), filter by stage, and page through results.
+- **Dashboard:** total candidates, new this week, active in pipeline, hired, a candidates-by-stage chart, and a recent activity feed.
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 14 (App Router) with TypeScript |
+| Styling | Tailwind CSS |
+| Database | PostgreSQL on Neon |
+| ORM | Prisma 5 |
+| Validation | Zod |
+| Charts | Recharts |
+| Hosting | Vercel |
+
+## Data model
+
+- **Candidate:** name, email (unique), phone, role, source, resume link, notes, stage, timestamps.
+- **StageChange:** candidate, from stage, to stage, timestamp. One row is written for every stage change, and one when a candidate is created.
+
+## Design decisions
+
+- **Applicant details are read-only after creation.** What the applicant submitted is the record. Interviewers can only change a candidate's stage and add notes. This is enforced on the server too: the update endpoint accepts only `notes` and rejects any other field.
+- **Stage change and history are saved in one database write,** so a candidate can never change stage without a history entry.
+- **Optimistic UI.** The stage dropdown updates instantly and rolls back with an error message if saving fails.
+- **Server-side search and pagination,** with indexes on `stage` and `name`.
+- **Input validation on every write** with Zod, and clear error responses: 400 (invalid input), 404 (not found), 409 (duplicate email).
+
+## API
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/api/candidates?q=&stage=&page=&pageSize=` | List, search, filter, paginate |
+| POST | `/api/candidates` | Create a candidate |
+| GET | `/api/candidates/:id` | Candidate with stage history |
+| PATCH | `/api/candidates/:id` | Update notes only |
+| DELETE | `/api/candidates/:id` | Delete a candidate |
+| PATCH | `/api/candidates/:id/stage` | Change stage (writes history) |
+| GET | `/api/dashboard` | Dashboard metrics |
+
+### Creating candidates from another application
+
+Another system (a careers page, a job-board webhook) can create candidates by sending JSON:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+curl -X POST YOUR-LIVE-LINK/api/candidates \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Neha Sharma",
+    "email": "neha@example.com",
+    "role": "Full Stack Developer",
+    "phone": "+91 98765 43210",
+    "source": "Careers page",
+    "resumeUrl": "https://example.com/neha-resume.pdf"
+  }'
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`name`, `email`, and `role` are required. Responses: `201` with the created candidate, `400` with field errors, `409` if the email already exists.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run locally
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Requires Node.js 18+ and a PostgreSQL database (a free Neon project works).
 
-## Learn More
+```bash
+git clone https://github.com/KOUSHIK-SAI-TALLURI/mini-ats.git
+cd mini-ats
+npm install
+copy .env.example .env      # macOS/Linux: cp .env.example .env
+# edit .env and add your database connection strings
+npx prisma migrate deploy
+npx tsx prisma/seed.ts      # optional sample data
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Known limitations and next steps
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- There is no authentication, since this is a demo with sample data. A production version would add login, roles, and an API key for external intake.
+- Resume links are stored as URLs. File upload and resume parsing would be natural additions.
+- Next steps: Kanban board, richer dashboard charts, and CSV export.
