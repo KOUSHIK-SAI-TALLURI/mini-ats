@@ -1,113 +1,258 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+
+import { useCallback, useEffect, useState } from "react";
+import CandidateForm from "@/components/CandidateForm";
+import { STAGE_STYLES } from "@/components/stageStyles";
+import { Candidate, Stage, STAGES, STAGE_LABELS } from "@/lib/types";
+
+type ListResponse = {
+  items: Candidate[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export default function CandidatesPage() {
+  const [data, setData] = useState<ListResponse | null>(null);
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [stage, setStage] = useState<"" | Stage>("");
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQ(q);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: "10" });
+      if (debouncedQ) params.set("q", debouncedQ);
+      if (stage) params.set("stage", stage);
+      const res = await fetch(`/api/candidates?${params}`);
+      if (!res.ok) throw new Error("Failed to load candidates");
+      setData(await res.json());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debouncedQ, stage]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+    async function changeStage(id: string, newStage: Stage) {
+    const previous = data;
+    setError("");
+
+    setData((d) => {
+      if (!d) return d;
+      if (stage && newStage !== stage) {
+        return {
+          ...d,
+          items: d.items.filter((c) => c.id !== id),
+          total: d.total - 1,
+        };
+      }
+      return {
+        ...d,
+        items: d.items.map((c) => (c.id === id ? { ...c, stage: newStage } : c)),
+      };
+    });
+
+    try {
+      const res = await fetch(`/api/candidates/${id}/stage`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: newStage }),
+      });
+      if (!res.ok) throw new Error("failed");
+    } catch {
+      setData(previous);
+      setError("Could not update stage. Your change was undone.");
+    }
+  }
+
+  async function remove(id: string, name: string) {
+    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+    const res = await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setError("Could not delete candidate");
+      return;
+    }
+    if (data && data.items.length === 1 && page > 1) {
+      setPage(page - 1);
+    } else {
+      load();
+    }
+  }
+
+  const th = "px-4 py-3 font-medium";
+  const td = "px-4 py-3";
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Candidates</h1>
+          <p className="text-sm text-gray-500">
+            {data ? `${data.total} total` : "Loading..."}
+          </p>
         </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          + Add candidate
+        </button>
       </div>
 
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by name, email or role"
+          className="w-full max-w-sm rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
         />
+        <select
+          value={stage}
+          onChange={(e) => {
+            setStage(e.target.value as "" | Stage);
+            setPage(1);
+          }}
+          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">All stages</option>
+          {STAGES.map((s) => (
+            <option key={s} value={s}>
+              {STAGE_LABELS[s]}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+      {error && (
+        <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
+      <div className="overflow-x-auto rounded-lg border bg-white">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
+            <tr>
+              <th className={th}>Candidate</th>
+              <th className={th}>Role</th>
+              <th className={th}>Source</th>
+              <th className={th}>Stage</th>
+              <th className={th}>Added</th>
+              <th className={th}></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {loading && !data ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                  Loading...
+                </td>
+              </tr>
+            ) : data && data.items.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                  No candidates found. Try a different search or add a new one.
+                </td>
+              </tr>
+            ) : (
+              data?.items.map((c) => (
+                <tr key={c.id}>
+                  <td className={td}>
+                    <Link
+  href={`/candidates/${c.id}`}
+  className="font-medium text-blue-700 hover:underline"
+>
+  {c.name}
+</Link>
+                    <div className="text-xs text-gray-500">{c.email}</div>
+                  </td>
+                  <td className={td}>{c.role}</td>
+                  <td className={td}>{c.source ?? "-"}</td>
+                  <td className={td}>
+                    <select
+                      value={c.stage}
+                      onChange={(e) => changeStage(c.id, e.target.value as Stage)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium ${STAGE_STYLES[c.stage]}`}
+                    >
+                      {STAGES.map((s) => (
+                        <option key={s} value={s}>
+                          {STAGE_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className={td}>
+                    {new Date(c.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className={td}>
+                    <button
+                      onClick={() => remove(c.id, c.name)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-    </main>
+
+      {data && data.totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="text-gray-500">
+            Page {data.page} of {data.totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page <= 1}
+              className="rounded-md border bg-white px-3 py-1.5 disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= data.totalPages}
+              className="rounded-md border bg-white px-3 py-1.5 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <CandidateForm
+          onClose={() => setShowForm(false)}
+          onCreated={() => {
+            setShowForm(false);
+            load();
+          }}
+        />
+      )}
+    </div>
   );
 }
