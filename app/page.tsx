@@ -117,6 +117,10 @@ export default function CandidatesPage() {
   const th = "px-4 py-3 font-medium";
   const td = "px-4 py-3";
   const toggleBase = "px-3 py-1.5 text-sm font-medium";
+    const exportParams = new URLSearchParams();
+  if (debouncedQ) exportParams.set("q", debouncedQ);
+  if (stage && view === "table") exportParams.set("stage", stage);
+  const exportHref = `/api/candidates/export?${exportParams}`;
 
   return (
     <div>
@@ -128,6 +132,12 @@ export default function CandidatesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+                    <a
+            href={exportHref}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Export CSV
+          </a>
           <div className="flex overflow-hidden rounded-md border border-gray-300 bg-white">
             <button
               onClick={() => switchView("table")}
