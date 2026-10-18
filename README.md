@@ -6,7 +6,7 @@ A small Applicant Tracking System for managing candidates through a hiring pipel
 | --- | --- |
 | **Live app** | https://mini-ats-six-ruddy.vercel.app/ |
 | **Repository** | https://github.com/KOUSHIK-SAI-TALLURI/mini-ats |
-| **Demo video** | DEMO-VIDEO-LINK |
+| **Demo video** | https://drive.google.com/file/d/1gB3t_P3r7Q2Oyx8Ptf2MyCFVkSEnBpzw/view?usp=drive_link |
 
 > The database runs on a free tier that sleeps when idle, so the very first request after a quiet period can take a couple of seconds.
 
